@@ -1,5 +1,0 @@
-mcp
-simple-salesforce
-python-dotenv
-requests
-
