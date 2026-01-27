@@ -63,7 +63,5 @@ If you want to run the MCP tool server directly for external MCP clients:
 python backend\server.py
 ```
 
-### MCP Configuration
 
-For external MCP clients (like Kiro), use the configuration in `.kiro/settings/mcp.json`.
 

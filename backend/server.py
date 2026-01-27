@@ -1,8 +1,5 @@
 """
-MCP server entrypoint.
-
-Same import-path bootstrap as `backend/api.py` so `python backend/server.py`
-works from a fresh shell on Windows.
+MCP server entrypoint for cloud deployment.
 """
 
 from __future__ import annotations
@@ -10,15 +7,36 @@ from __future__ import annotations
 import os
 import sys
 
-if __package__ is None:  # running as a script: `python backend/server.py`
-    _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if _repo_root not in sys.path:
-        sys.path.insert(0, _repo_root)
+# Add project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from backend.tools.ask_tool import mcp
+# Add backend to path
+backend_path = os.path.join(project_root, 'backend')
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
+
+from tools.ask_tool import mcp
 
 
 if __name__ == "__main__":
     print("🚀 Salesforce MCP POC running...")
-    mcp.run()
+    
+    # Get port from environment (Railway sets this automatically)
+    port = int(os.environ.get("PORT", 8080))
+    host = "0.0.0.0"  # Required for Railway
+    
+    print(f"🌐 Server starting on {host}:{port}")
+    print(f"📁 Project root: {project_root}")
+    print(f"🐍 Python path: {sys.path[:3]}...")
+    
+    try:
+        # Run MCP server with HTTP transport for cloud deployment
+        mcp.run(transport="sse", host=host, port=port)
+    except Exception as e:
+        print(f"❌ Server failed to start: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "salesforce-agent": {
+      "command": "python",
+      "args": ["backend/server.py"],
+      "cwd": "C:\\Users\\Manish Reddy\\Desktop\\MCP POC",
+      "env": {
+        "PYTHONPATH": "C:\\Users\\Manish Reddy\\Desktop\\MCP POC"
+      }
+    }
+  }
+}

@@ -25,12 +25,8 @@ wheels/
 .installed.cfg
 *.egg
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Environment variables (keep local .env private)
+backend/.env
 
 # IDE
 .vscode/
@@ -52,3 +48,6 @@ node_modules/
 # Build outputs
 dist/
 build/
+
+# Test files
+test_mcp_server.py
