@@ -34,11 +34,11 @@ railway up
 In Railway dashboard, go to your project → Variables tab and add:
 
 ```
-SF_USERNAME=gellasangamesh95@fieldservice.com
-SF_PASSWORD=Disang_1124
-SF_SECURITY_TOKEN=7IVzj7cMbm0pObgb751p9fTeo
+SF_USERNAME=your_salesforce_username
+SF_PASSWORD=your_salesforce_password
+SF_SECURITY_TOKEN=your_salesforce_security_token
 SF_DOMAIN=login
-OPENAI_API_KEY=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
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ## 4. Get Your MCP Server URL

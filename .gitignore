@@ -27,6 +27,7 @@ wheels/
 
 # Environment variables (keep local .env private)
 backend/.env
+ACTUAL_CREDENTIALS.txt
 
 # IDE
 .vscode/

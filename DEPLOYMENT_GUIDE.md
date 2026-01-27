@@ -16,11 +16,11 @@ railway login
 railway init
 
 # Add environment variables
-railway variables set SF_USERNAME="gellasangamesh95@fieldservice.com"
-railway variables set SF_PASSWORD="Disang_1124"
-railway variables set SF_SECURITY_TOKEN="7IVzj7cMbm0pObgb751p9fTeo"
+railway variables set SF_USERNAME="your_salesforce_username"
+railway variables set SF_PASSWORD="your_salesforce_password"
+railway variables set SF_SECURITY_TOKEN="your_salesforce_security_token"
 railway variables set SF_DOMAIN="login"
-railway variables set OPENAI_API_KEY="your_openai_key"
+railway variables set OPENAI_API_KEY="your_openai_api_key"
 
 # Deploy
 railway up
@@ -47,11 +47,11 @@ After deployment, Railway will give you a URL like:
 
 ### 3. Add Environment Variables
 In Render dashboard, add:
-- `SF_USERNAME`: gellasangamesh95@fieldservice.com
-- `SF_PASSWORD`: Disang_1124
-- `SF_SECURITY_TOKEN`: 7IVzj7cMbm0pObgb751p9fTeo
+- `SF_USERNAME`: your_salesforce_username
+- `SF_PASSWORD`: your_salesforce_password
+- `SF_SECURITY_TOKEN`: your_salesforce_security_token
 - `SF_DOMAIN`: login
-- `OPENAI_API_KEY`: your_openai_key
+- `OPENAI_API_KEY`: your_openai_api_key
 
 ## Option 3: Use ngrok (Quick Testing)
 
