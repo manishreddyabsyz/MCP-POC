@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "salesforce-agent": {
+      "command": "python",
+      "args": ["backend/server.py"],
+      "env": {},
+      "disabled": false,
+      "autoApprove": ["ask", "salesforce_health"]
+    }
+  }
+}

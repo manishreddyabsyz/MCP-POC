@@ -12,3 +12,4 @@ def route_query(query: str):
     if "case" in q:
         return "case"
     return "search"
+

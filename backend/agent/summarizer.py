@@ -4,3 +4,4 @@ def summarize_case(case):
         "subject": case["Subject"],
         "description": case.get("Description", "No description"),
     }
+
