@@ -70,12 +70,37 @@ async def debug_env():
 @app.post("/ask")
 async def ask_endpoint(request: dict):
     """HTTP endpoint for MCP ask tool"""
+    print(f"🔍 Ask endpoint called")
+    print(f"   Raw request: {request}")
+    print(f"   Request type: {type(request)}")
+    
     try:
-        user_query = request.get("user_query", "")
-        session_id = request.get("session_id", "default")
+        # Handle both Custom GPT format (nested under 'params') and direct format
+        if "params" in request:
+            # Custom GPT format
+            params = request["params"]
+            user_query = params.get("user_query", "")
+            session_id = params.get("session_id", "default")
+            print(f"   Using Custom GPT format (params)")
+        else:
+            # Direct format (Postman, etc.)
+            user_query = request.get("user_query", "")
+            session_id = request.get("session_id", "default")
+            print(f"   Using direct format")
+        
+        print(f"   Extracted query: '{user_query}'")
+        print(f"   Extracted session: '{session_id}'")
+        print(f"   Query type: {type(user_query)}")
+        
         result = ask(user_query, session_id)
+        print(f"✅ Ask result type: {result.get('type', 'unknown')}")
+        print(f"   Result keys: {list(result.keys())}")
+        
         return result
     except Exception as e:
+        print(f"❌ Ask endpoint failed: {e}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={"error": str(e)}

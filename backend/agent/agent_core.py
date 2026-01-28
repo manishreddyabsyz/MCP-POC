@@ -203,6 +203,10 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         )
 
     primary_token = _extract_primary_token(q)
+    print(f"🔍 Case detection debug:")
+    print(f"   Input query: '{q}'")
+    print(f"   Primary token: '{primary_token}'")
+    print(f"   Primary token length: {len(primary_token) if primary_token else 'None'}")
 
     # Business rule:
     # - If the primary token is 18 chars long, treat it as Case Id
@@ -213,7 +217,9 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         if len(primary_token) == 18:
             case_id = primary_token
             case_number = None
+            print(f"   → Treating as Case ID: {case_id}")
         elif 9 <= len(primary_token) < 18:  # Fixed: was 8 < len, now 9 <=
+            print(f"   → Invalid Case ID length, asking for clarification")
             return _clarification_payload(
                 session_id=session_id,
                 message="That looks like a Case Id but it is not 18 characters long. Please enter the correct 18-character Case Id, or provide the numeric CaseNumber instead.",
@@ -225,9 +231,11 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         else:
             case_id = None
             case_number = _extract_case_number(q)
+            print(f"   → Treating as Case Number: {case_number}")
     else:
         case_id = None
         case_number = _extract_case_number(q)
+        print(f"   → No primary token, extracted case number: {case_number}")
 
     case: Dict[str, Any] | None
     source: str
