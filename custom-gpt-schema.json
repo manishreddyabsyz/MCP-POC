@@ -1,0 +1,73 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Salesforce MCP Server",
+    "description": "Query and analyze Salesforce cases",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://web-production-7ed54.up.railway.app"
+    }
+  ],
+  "paths": {
+    "/ask": {
+      "post": {
+        "description": "Query Salesforce cases with natural language",
+        "operationId": "askSalesforce",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_query": {
+                    "type": "string",
+                    "description": "Natural language query about Salesforce cases"
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "Session identifier",
+                    "default": "chatgpt"
+                  }
+                },
+                "required": ["user_query"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Check Salesforce connection health",
+        "operationId": "checkHealth",
+        "responses": {
+          "200": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

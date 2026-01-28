@@ -213,7 +213,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         if len(primary_token) == 18:
             case_id = primary_token
             case_number = None
-        elif 8 < len(primary_token) < 18:
+        elif 9 <= len(primary_token) < 18:  # Fixed: was 8 < len, now 9 <=
             return _clarification_payload(
                 session_id=session_id,
                 message="That looks like a Case Id but it is not 18 characters long. Please enter the correct 18-character Case Id, or provide the numeric CaseNumber instead.",

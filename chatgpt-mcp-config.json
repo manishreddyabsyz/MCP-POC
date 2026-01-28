@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "salesforce-agent": {
+      "command": "curl",
+      "args": [
+        "-X", "POST", 
+        "https://YOUR-RAILWAY-URL.railway.app/ask",
+        "-H", "Content-Type: application/json",
+        "-d", "@-"
+      ],
+      "transport": "stdio"
+    }
+  }
+}

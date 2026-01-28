@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesforce MCP Server Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .examples {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .examples h3 {
+            margin-top: 0;
+        }
+        .example-query {
+            background: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 3px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+        }
+        .example-query:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Salesforce MCP Server Test</h1>
+        <p><strong>Server URL:</strong> https://web-production-7ed54.up.railway.app</p>
+        
+        <button onclick="testHealth()">Test Health Check</button>
+        
+        <div class="input-group">
+            <label for="query">Enter your Salesforce query:</label>
+            <textarea id="query" rows="3" placeholder="e.g., Show me case 12345"></textarea>
+        </div>
+        
+        <button onclick="askSalesforce()">Ask Salesforce</button>
+        
+        <div class="examples">
+            <h3>📝 Example Queries (Click to use):</h3>
+            <div class="example-query" onclick="setQuery('Show me case 12345')">Show me case 12345</div>
+            <div class="example-query" onclick="setQuery('List all in progress cases')">List all in progress cases</div>
+            <div class="example-query" onclick="setQuery('Search for cases about login issues')">Search for cases about login issues</div>
+            <div class="example-query" onclick="setQuery('Show comments for case 12345')">Show comments for case 12345</div>
+            <div class="example-query" onclick="setQuery('Show history for case 12345')">Show history for case 12345</div>
+        </div>
+        
+        <div id="response" class="response" style="display: none;"></div>
+    </div>
+
+    <script>
+        const serverUrl = 'https://web-production-7ed54.up.railway.app';
+        
+        function setQuery(query) {
+            document.getElementById('query').value = query;
+        }
+        
+        async function testHealth() {
+            showResponse('Testing health check...');
+            try {
+                const response = await fetch(`${serverUrl}/health`);
+                const data = await response.json();
+                showResponse(`Health Check Result:\n${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResponse(`Error: ${error.message}`);
+            }
+        }
+        
+        async function askSalesforce() {
+            const query = document.getElementById('query').value.trim();
+            if (!query) {
+                alert('Please enter a query');
+                return;
+            }
+            
+            showResponse('Querying Salesforce...');
+            try {
+                const response = await fetch(`${serverUrl}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_query: query,
+                        session_id: 'web-test'
+                    })
+                });
+                
+                const data = await response.json();
+                showResponse(`Query: ${query}\n\nResponse:\n${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResponse(`Error: ${error.message}`);
+            }
+        }
+        
+        function showResponse(text) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.textContent = text;
+            responseDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
