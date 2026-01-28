@@ -50,6 +50,23 @@ async def health_check():
             }
         )
 
+@app.get("/debug/env")
+async def debug_env():
+    """Debug endpoint to check environment variables"""
+    from backend.salesforce.health import test_connection_details
+    
+    try:
+        details = test_connection_details()
+        return {
+            "environment_check": details,
+            "note": "Check if all required SF_ variables are set in Railway"
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
 @app.post("/ask")
 async def ask_endpoint(request: dict):
     """HTTP endpoint for MCP ask tool"""
