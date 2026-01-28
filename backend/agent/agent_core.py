@@ -17,8 +17,23 @@ _CASE_ID_RE = re.compile(r"\b500[0-9A-Za-z]{15}\b")
 
 
 def _extract_case_number(text: str) -> Optional[str]:
-    m = _CASE_NUMBER_RE.search(text or "")
-    return m.group(0) if m else None
+    """
+    Extract a numeric case number (like 00001159).
+    """
+    if not text:
+        return None
+    
+    # Look for patterns like "case 00001159" or "CaseNumber = 00001159"
+    case_num_pattern = re.search(r"(?:case|casenumber)\s*[=:]?\s*(\d+)", text, re.IGNORECASE)
+    if case_num_pattern:
+        return case_num_pattern.group(1)
+    
+    # Fallback: any standalone number (but be more specific)
+    standalone_num = re.search(r"\b(\d{5,10})\b", text)
+    if standalone_num:
+        return standalone_num.group(1)
+    
+    return None
 
 
 def _extract_case_id(text: str) -> Optional[str]:
@@ -29,9 +44,30 @@ def _extract_case_id(text: str) -> Optional[str]:
 def _extract_primary_token(text: str) -> Optional[str]:
     """
     Extract a 9–18 character alphanumeric token that could be a Case Id.
+    Prioritize tokens that look like Salesforce IDs (start with numbers or specific patterns).
     """
-    m = re.search(r"\b[A-Za-z0-9]{9,18}\b", text or "")
-    return m.group(0) if m else None
+    if not text:
+        return None
+    
+    # First, try to find a proper Salesforce Case ID (starts with 500, 18 chars)
+    case_id_match = _CASE_ID_RE.search(text)
+    if case_id_match:
+        return case_id_match.group(0)
+    
+    # Then, look for any 15-18 character alphanumeric token (likely Salesforce ID)
+    long_id_match = re.search(r"\b[A-Za-z0-9]{15,18}\b", text)
+    if long_id_match:
+        return long_id_match.group(0)
+    
+    # Finally, look for 9-14 character tokens (might be invalid IDs)
+    medium_token_match = re.search(r"\b[A-Za-z0-9]{9,14}\b", text)
+    if medium_token_match:
+        token = medium_token_match.group(0)
+        # Skip common words that aren't IDs
+        if token.lower() not in ['salesforce', 'casenumber', 'case']:
+            return token
+    
+    return None
 
 
 def _looks_like_confirmation(text: str) -> Optional[bool]:
