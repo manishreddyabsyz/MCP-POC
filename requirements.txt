@@ -22,7 +22,7 @@ jsonschema-specifications==2025.9.1
 lxml==6.0.2
 mcp==1.25.0
 more-itertools==10.8.0
-openai==2.15.0
+
 platformdirs==4.5.1
 pycparser==3.0
 pydantic==2.12.5

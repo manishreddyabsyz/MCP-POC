@@ -7,8 +7,7 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class SessionState:
     session_id: str
-    level1_case_summary: Optional[str] = None
-    level1_case_pack: Optional[Dict[str, Any]] = None
+    case_data: Optional[Dict[str, Any]] = None  # Structured case data for ChatGPT
     level2_qa: List[Dict[str, str]] = field(default_factory=list)  # {"q": "...", "a": "..."}
     pending_knowledge_article: Optional[Dict[str, Any]] = None
 

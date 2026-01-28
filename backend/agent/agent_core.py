@@ -4,9 +4,9 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from agent.gpt_prompts import (
-    gpt_answer_followup_grounded,
-    gpt_generate_case_pack,
-    gpt_generate_knowledge_article,
+    prepare_case_data,
+    prepare_followup_context,
+    prepare_knowledge_article_data,
 )
 from agent.memory import MemoryStore
 
@@ -83,49 +83,39 @@ def _clarification_payload(*, message: str, questions: List[str], session_id: st
     return {"type": "clarification", "session_id": session_id, "message": message, "questions": questions}
 
 
-def _case_response_payload(*, case: Dict[str, Any], pack: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+def _case_response_payload(*, case: Dict[str, Any], case_data: Dict[str, Any], session_id: str) -> Dict[str, Any]:
     return {
         "type": "case_response",
         "session_id": session_id,
         "case_number": case.get("CaseNumber"),
-        "case_type": pack.get("case_type"),
-        "case_summary": pack.get("case_summary"),
-        "technical_summary": pack.get("technical_summary"),
-        "troubleshooting_steps": pack.get("troubleshooting_steps"),
-        "next_actions": pack.get("next_actions"),
-        "assumptions_and_gaps": pack.get("assumptions_and_gaps"),
-        "tree": pack.get("tree"),
-        "level1_knowledge": {
-            "case_summary": pack.get("case_summary"),
-            "technical_summary": pack.get("technical_summary"),
-            "troubleshooting_steps": pack.get("troubleshooting_steps"),
-            "next_actions": pack.get("next_actions"),
-        },
-        "prompt_knowledge_article_confirmation": (
-            "If the solution is validated, reply 'confirm' to generate a knowledge article draft."
-        ),
+        "case_data": case_data,
+        "raw_case": case,
+        "instructions": "Analyze this Salesforce case data and provide: 1) Case summary, 2) Technical analysis, 3) Troubleshooting steps, 4) Next actions, 5) Any assumptions or information gaps. Ask follow-up questions if you need clarification."
     }
 
 
 def _followup_answer_payload(
-    *, grounded: Dict[str, Any], session_id: str, stored: bool, new_qa: Optional[Dict[str, str]] = None
+    *, context_data: Dict[str, Any], session_id: str, stored: bool, new_qa: Optional[Dict[str, str]] = None
 ) -> Dict[str, Any]:
     payload = {
         "type": "followup_answer",
         "session_id": session_id,
-        "needs_clarification": grounded.get("needs_clarification"),
-        "answer": grounded.get("answer"),
-        "follow_up_questions": grounded.get("follow_up_questions"),
-        "citations": grounded.get("citations"),
-        "stored_as_level2_knowledge": stored,
+        "context_data": context_data,
+        "stored_as_conversation": stored,
+        "instructions": "Use the case context and conversation history to answer the user's question. If you need more information, ask specific follow-up questions."
     }
     if new_qa:
-        payload["new_level2_qa"] = new_qa
+        payload["new_qa_pair"] = new_qa
     return payload
 
 
-def _knowledge_article_payload(*, article: Dict[str, Any], session_id: str) -> Dict[str, Any]:
-    return {"type": "knowledge_article", "session_id": session_id, "article": article}
+def _knowledge_article_payload(*, article_data: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+    return {
+        "type": "knowledge_article", 
+        "session_id": session_id, 
+        "article_data": article_data,
+        "instructions": "Create a knowledge article based on this case data and conversation. Include: title, problem statement, environment, symptoms, root cause, resolution steps, verification steps, and prevention notes."
+    }
 
 
 def _load_case_by_number(case_number: str) -> Tuple[Optional[Dict[str, Any]], str, Optional[str]]:
@@ -205,13 +195,13 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
     if state.pending_knowledge_article is not None:
         conf = _looks_like_confirmation(q)
         if conf is True:
-            article = gpt_generate_knowledge_article(
-                level1_case_pack=state.level1_case_pack or {},
-                level2_qa=state.level2_qa,
-                title_hint=(state.level1_case_pack or {}).get("case_type"),
+            article_data = prepare_knowledge_article_data(
+                case_data=state.case_data or {},
+                conversation_history=state.level2_qa,
+                title_hint=(state.case_data or {}).get("subject"),
             )
             state.pending_knowledge_article = None
-            return _knowledge_article_payload(article=article, session_id=session_id)
+            return _knowledge_article_payload(article_data=article_data, session_id=session_id)
         if conf is False:
             state.pending_knowledge_article = None
             return {"type": "ok", "session_id": session_id, "message": "Okay—knowledge article creation cancelled."}
@@ -405,12 +395,11 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
                 "case_source": source,
             }
 
-        pack = gpt_generate_case_pack(case)
-        state.level1_case_pack = pack
-        state.level1_case_summary = pack.get("case_summary")
+        case_data = prepare_case_data(case)
+        state.case_data = case_data
         state.level2_qa = []
 
-        payload = _case_response_payload(case=case, pack=pack, session_id=session_id)
+        payload = _case_response_payload(case=case, case_data=case_data, session_id=session_id)
         payload["case_source"] = source
         return payload
 
@@ -440,18 +429,16 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         except Exception:
             pass
 
-    if state.level1_case_pack:
-        grounded = gpt_answer_followup_grounded(
-            level1_case_pack=state.level1_case_pack,
-            level2_qa=state.level2_qa,
+    if state.case_data:
+        context_data = prepare_followup_context(
+            case_data=state.case_data,
+            conversation_history=state.level2_qa,
             user_question=q,
         )
-        if grounded.get("needs_clarification"):
-            return _followup_answer_payload(grounded=grounded, session_id=session_id, stored=False)
-
-        new_qa = {"q": q, "a": grounded.get("answer", "")}
+        
+        new_qa = {"q": q, "a": ""}  # ChatGPT will provide the answer
         state.level2_qa.append(new_qa)
-        return _followup_answer_payload(grounded=grounded, session_id=session_id, stored=True, new_qa=new_qa)
+        return _followup_answer_payload(context_data=context_data, session_id=session_id, stored=True, new_qa=new_qa)
 
     hits = _search_cases(q) if len(q) >= 5 else []
     if hits:
