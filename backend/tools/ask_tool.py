@@ -44,7 +44,7 @@ def salesforce_health():
     Returns:
         Connection status and user identity information
     """
-    from backend.salesforce.health import ping
+    from salesforce.health import ping
 
     try:
         identity = ping()

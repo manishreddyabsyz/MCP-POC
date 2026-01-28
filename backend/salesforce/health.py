@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.salesforce.connection import sf
+from salesforce.connection import sf
 
 
 def ping() -> dict:
