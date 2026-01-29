@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from agent.gpt_prompts import (
+from backend.agent.data_processing import (
     prepare_case_data,
     prepare_followup_context,
     prepare_knowledge_article_data,
@@ -54,17 +54,20 @@ def _extract_primary_token(text: str) -> Optional[str]:
     if case_id_match:
         return case_id_match.group(0)
     
-    # Then, look for any 15-18 character alphanumeric token (likely Salesforce ID)
-    long_id_match = re.search(r"\b[A-Za-z0-9]{15,18}\b", text)
-    if long_id_match:
-        return long_id_match.group(0)
+    # Then, look for any 15-18 character alphanumeric token that looks like an ID
+    # Must start with a number or contain mixed alphanumeric (not just letters)
+    long_id_matches = re.findall(r"\b[A-Za-z0-9]{15,18}\b", text)
+    for token in long_id_matches:
+        # Skip pure alphabetic words (like 'troubleshooting')
+        if not token.isalpha() and not token.lower() in ['salesforce', 'casenumber']:
+            return token
     
-    # Finally, look for 9-14 character tokens (might be invalid IDs)
-    medium_token_match = re.search(r"\b[A-Za-z0-9]{9,14}\b", text)
-    if medium_token_match:
-        token = medium_token_match.group(0)
-        # Skip common words that aren't IDs
-        if token.lower() not in ['salesforce', 'casenumber', 'case']:
+    # Finally, look for 9-14 character tokens that look like IDs
+    medium_token_matches = re.findall(r"\b[A-Za-z0-9]{9,14}\b", text)
+    for token in medium_token_matches:
+        # Skip common words and pure alphabetic tokens
+        if (not token.isalpha() and 
+            token.lower() not in ['salesforce', 'casenumber', 'case', 'troubleshooting']):
             return token
     
     return None
@@ -236,7 +239,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
 
     # Business rule:
     # - If the primary token is 18 chars long, treat it as Case Id
-    # - If it is between 9 and 17 characters, it is probably an invalid Case Id
+    # - If it is between 9 and 17 characters and looks like an ID, it is probably an invalid Case Id
     #   → ask the user to enter the correct Case Id instead of treating it as a CaseNumber
     # - Otherwise, treat it as CaseNumber (no strict length limit)
     if primary_token:
@@ -244,7 +247,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
             case_id = primary_token
             case_number = None
             print(f"   → Treating as Case ID: {case_id}")
-        elif 9 <= len(primary_token) < 18:  # Fixed: was 8 < len, now 9 <=
+        elif 9 <= len(primary_token) < 18:
             print(f"   → Invalid Case ID length, asking for clarification")
             return _clarification_payload(
                 session_id=session_id,
@@ -255,9 +258,10 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
                 ],
             )
         else:
+            # This shouldn't happen with the updated _extract_primary_token, but fallback to case number
             case_id = None
             case_number = _extract_case_number(q)
-            print(f"   → Treating as Case Number: {case_number}")
+            print(f"   → Unexpected primary token length, treating as Case Number: {case_number}")
     else:
         case_id = None
         case_number = _extract_case_number(q)
