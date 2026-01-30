@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from backend.agent.data_processing import (
+from agent.data_processing import (
     prepare_case_data,
     prepare_followup_context,
     prepare_knowledge_article_data,
@@ -93,7 +93,71 @@ def _case_response_payload(*, case: Dict[str, Any], case_data: Dict[str, Any], s
         "case_number": case.get("CaseNumber"),
         "case_data": case_data,
         "raw_case": case,
-        "instructions": "Analyze this Salesforce case data and provide: 1) Case summary, 2) Technical analysis, 3) Troubleshooting steps, 4) Next actions, 5) Any assumptions or information gaps. Ask follow-up questions if you need clarification."
+        "instructions": """Analyze this Salesforce case data and provide a structured response with these 4 sections. Answer the user's specific question while maintaining this structure:
+
+1. Case Summarization & Contextualization
+   - Brief overview of the case type and current state
+   - Context about customer situation and case history
+   - Address the user's specific question in context
+
+2. Technical Case Summary
+   - Issue Type: [Category/Area]
+   - Fix Status: [Current status]
+   - Validation Status: [Testing/verification state]
+   - Current State: [What's happening now]
+   - Closure Dependency: [What's needed for closure]
+
+3. Troubleshooting / Resolution Recommendation Steps
+   - List specific steps to resolve or progress the case
+   - Include validation and verification steps
+   - Mention any dependencies or prerequisites
+   - Address any specific actions related to the user's query
+
+4. Action
+   - Clear next steps to take
+   - Who should do what
+   - Timeline considerations
+   - Specific actions related to the user's question
+
+IMPORTANT: Always answer the user's specific question within this 4-section structure. If they asked for status, emphasize status information. If they asked for comments, include comment analysis. The structure should enhance, not replace, the direct answer to their query.
+
+Format your response with clear section headers and structured information."""
+    }
+
+
+def _technical_followup_payload(*, case_data: Dict[str, Any], session_id: str, user_question: str) -> Dict[str, Any]:
+    return {
+        "type": "technical_followup",
+        "session_id": session_id,
+        "case_data": case_data,
+        "user_question": user_question,
+        "instructions": """This is a follow-up on an existing technical case. Structure your response with these 4 sections:
+
+1. Case Summarization & Contextualization
+   - Summarize the ongoing technical case and current status
+   - Contextualize the customer's follow-up question
+   - Reference any previous work done
+
+2. Technical Case Summary
+   - Issue Type: [Firmware/SDK/Runtime/etc.]
+   - Fix Status: [Implemented/In Progress/Pending/etc.]
+   - Validation Status: [Testing Complete/In Progress/Pending/etc.]
+   - Current State: [Monitoring/Closed/Open/etc.]
+   - Closure Dependency: [What's needed before case closure]
+
+3. Troubleshooting / Resolution Recommendation Steps
+   - Review previously implemented changes
+   - Verify testing results and current status
+   - List steps to confirm resolution or next actions
+   - Include any monitoring or validation steps
+
+4. Action
+   - Immediate next steps required
+   - Who should take action and when
+   - Communication plan for case closure
+   - Timeline considerations
+
+Always include a knowledge article prompt at the end: 'This resolved technical issue can be reused as a reference. Would you like to convert this solution into a Knowledge Article for future cases?'"""
     }
 
 
@@ -105,7 +169,30 @@ def _followup_answer_payload(
         "session_id": session_id,
         "context_data": context_data,
         "stored_as_conversation": stored,
-        "instructions": "Use the case context and conversation history to answer the user's question. If you need more information, ask specific follow-up questions."
+        "instructions": """Use the case context and conversation history to answer the user's question. For technical follow-up cases, structure your response with these 4 sections:
+
+1. Case Summarization & Contextualization
+   - Current case status and what has been done
+   - Customer's specific follow-up question context
+
+2. Technical Case Summary
+   - Issue Type: [Category/Area]
+   - Fix Status: [What's been implemented]
+   - Validation Status: [Testing/monitoring state]
+   - Current State: [Current situation]
+   - Closure Dependency: [What's needed for closure]
+
+3. Troubleshooting / Resolution Recommendation Steps
+   - Review what has been done
+   - Verify current status
+   - Confirm next steps needed
+
+4. Action
+   - Immediate next steps
+   - Timeline for completion
+   - Communication plan
+
+If you need more information, ask specific follow-up questions."""
     }
     if new_qa:
         payload["new_qa_pair"] = new_qa
@@ -279,7 +366,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         case, source, detail = None, "", None
     print(case_id,"caseid")
     if case_id or case_number:
-        # Explicit "comments" request
+        # Explicit "comments" request - use 4-section structure with comments focus
         if "comment" in q_lower:
             comments, source, detail = _load_case_comments(case_id or (case or {}).get("Id")) if (case_id or case) else ([], "", None)
             print(comments,"comments")
@@ -292,25 +379,19 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
                     "case_number": case_number,
                     "detail": detail,
                 }
-            if not comments:
-                return {
-                    "type": "case_comments",
-                    "session_id": session_id,
-                    "case_id": case_id or (case or {}).get("Id"),
-                    "case_number": case_number or (case or {}).get("CaseNumber"),
-                    "comments": [],
-                    "message": "No comments found for this case.",
-                }
-            return {
-                "type": "case_comments",
-                "session_id": session_id,
-                "case_id": case_id or (case or {}).get("Id"),
-                "case_number": case_number or (case or {}).get("CaseNumber"),
-                "comments": comments,
-                "message": "Here are the most recent case comments.",
-            }
+            
+            # Always use 4-section structure, even for comments
+            case_data = prepare_case_data(case)
+            state.case_data = case_data
+            state.level2_qa = []
+            
+            payload = _case_response_payload(case=case, case_data=case_data, session_id=session_id)
+            payload["case_source"] = source
+            payload["comments"] = comments
+            payload["query_focus"] = "Focus on analyzing the case comments in your response while maintaining the full 4-section structure. Include comment analysis in section 1 (contextualization) and relevant actions in section 4."
+            return payload
 
-        # Explicit "history" request
+        # Explicit "history" request - use 4-section structure with history focus
         if "history" in q_lower:
             history, source, detail = _load_case_history(case_id or (case or {}).get("Id")) if (case_id or case) else ([], "", None)
             if source == "salesforce_error":
@@ -322,25 +403,19 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
                     "case_number": case_number,
                     "detail": detail,
                 }
-            if not history:
-                return {
-                    "type": "case_history",
-                    "session_id": session_id,
-                    "case_id": case_id or (case or {}).get("Id"),
-                    "case_number": case_number or (case or {}).get("CaseNumber"),
-                    "history": [],
-                    "message": "No history found for this case.",
-                }
-            return {
-                "type": "case_history",
-                "session_id": session_id,
-                "case_id": case_id or (case or {}).get("Id"),
-                "case_number": case_number or (case or {}).get("CaseNumber"),
-                "history": history,
-                "message": "Here are the most recent case history changes.",
-            }
+            
+            # Always use 4-section structure, even for history
+            case_data = prepare_case_data(case)
+            state.case_data = case_data
+            state.level2_qa = []
+            
+            payload = _case_response_payload(case=case, case_data=case_data, session_id=session_id)
+            payload["case_source"] = source
+            payload["history"] = history
+            payload["query_focus"] = "Focus on analyzing the case history and changes in your response while maintaining the full 4-section structure. Include history analysis in section 1 (contextualization) and track progress in section 2."
+            return payload
 
-        # Explicit "feed" request
+        # Explicit "feed" request - use 4-section structure with feed focus
         if "feed" in q_lower:
             feed, source, detail = _load_case_feed(case_id or (case or {}).get("Id")) if (case_id or case) else ([], "", None)
             if source == "salesforce_error":
@@ -352,23 +427,17 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
                     "case_number": case_number,
                     "detail": detail,
                 }
-            if not feed:
-                return {
-                    "type": "case_feed",
-                    "session_id": session_id,
-                    "case_id": case_id or (case or {}).get("Id"),
-                    "case_number": case_number or (case or {}).get("CaseNumber"),
-                    "feed": [],
-                    "message": "No feed activity found for this case.",
-                }
-            return {
-                "type": "case_feed",
-                "session_id": session_id,
-                "case_id": case_id or (case or {}).get("Id"),
-                "case_number": case_number or (case or {}).get("CaseNumber"),
-                "feed": feed,
-                "message": "Here are the most recent case feed activities.",
-            }
+            
+            # Always use 4-section structure, even for feed
+            case_data = prepare_case_data(case)
+            state.case_data = case_data
+            state.level2_qa = []
+            
+            payload = _case_response_payload(case=case, case_data=case_data, session_id=session_id)
+            payload["case_source"] = source
+            payload["feed"] = feed
+            payload["query_focus"] = "Focus on analyzing the case feed activities in your response while maintaining the full 4-section structure. Include feed activity analysis in section 1 (contextualization) and relevant insights in section 3."
+            return payload
 
         if not case:
             if source == "salesforce_error":
@@ -388,16 +457,20 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
                 "case_number": case_number,
             }
 
-        if wants_status and ("resolve" not in q_lower) and ("summary" not in q_lower):
-            return {
-                "type": "case_status",
-                "session_id": session_id,
-                "case_number": case.get("CaseNumber"),
-                "status": case.get("Status"),
-                "priority": case.get("Priority"),
-                "subject": case.get("Subject"),
-                "case_source": source,
-            }
+        # Always use 4-section structure for case queries, but customize the focus based on the question
+        case_data = prepare_case_data(case)
+        state.case_data = case_data
+        state.level2_qa = []
+
+        # Determine the specific focus of the query for customized instructions
+        query_focus = ""
+        if wants_status:
+            query_focus = "Focus on providing current status information in section 2 (Technical Case Summary) while maintaining the full 4-section structure."
+        
+        payload = _case_response_payload(case=case, case_data=case_data, session_id=session_id)
+        payload["case_source"] = source
+        payload["query_focus"] = query_focus
+        return payload
 
         case_data = prepare_case_data(case)
         state.case_data = case_data
@@ -434,15 +507,34 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
             pass
 
     if state.case_data:
-        context_data = prepare_followup_context(
-            case_data=state.case_data,
-            conversation_history=state.level2_qa,
-            user_question=q,
+        # Check if this is a technical follow-up case
+        is_technical_followup = (
+            "follow" in q_lower and ("up" in q_lower or "followup" in q_lower) or
+            "status" in q_lower or "done" in q_lower or "resolved" in q_lower or
+            "fix" in q_lower or "implementation" in q_lower or "changes" in q_lower or
+            "monitoring" in q_lower or "closure" in q_lower or "complete" in q_lower
         )
         
-        new_qa = {"q": q, "a": ""}  # ChatGPT will provide the answer
-        state.level2_qa.append(new_qa)
-        return _followup_answer_payload(context_data=context_data, session_id=session_id, stored=True, new_qa=new_qa)
+        if is_technical_followup:
+            # Use technical followup structure for follow-up questions
+            new_qa = {"q": q, "a": ""}  # ChatGPT will provide the answer
+            state.level2_qa.append(new_qa)
+            return _technical_followup_payload(
+                case_data=state.case_data, 
+                session_id=session_id, 
+                user_question=q
+            )
+        else:
+            # Use regular followup for general questions
+            context_data = prepare_followup_context(
+                case_data=state.case_data,
+                conversation_history=state.level2_qa,
+                user_question=q,
+            )
+            
+            new_qa = {"q": q, "a": ""}  # ChatGPT will provide the answer
+            state.level2_qa.append(new_qa)
+            return _followup_answer_payload(context_data=context_data, session_id=session_id, stored=True, new_qa=new_qa)
 
     hits = _search_cases(q) if len(q) >= 5 else []
     if hits:
