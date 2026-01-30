@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Salesforce Case Assistant API",
-    "description": "API for querying Salesforce cases with natural language",
+    "description": "API for querying Salesforce cases with natural language. CRITICAL: ALL case responses must use the mandatory 4-section structure: 1) Case Summarization & Contextualization, 2) Technical Case Summary, 3) Troubleshooting Steps, 4) Action. Never provide simple status messages - always use the complete structured format with section headers.",
     "version": "1.0.0"
   },
   "servers": [
@@ -14,8 +14,8 @@
   "paths": {
     "/query": {
       "post": {
-        "summary": "Query Salesforce cases with natural language",
-        "description": "Submit natural language queries to get case information, comments, history, and analysis from Salesforce",
+        "summary": "Query Salesforce cases with natural language - ALL responses must use 4-section structure",
+        "description": "Submit natural language queries to get case information with mandatory 4-section analysis: 1) Case Summarization & Contextualization, 2) Technical Case Summary, 3) Troubleshooting Steps, 4) Action. Every case response must follow this structure regardless of query type.",
         "operationId": "querySalesforce",
         "requestBody": {
           "required": true,
@@ -49,7 +49,7 @@
                   "properties": {
                     "type": {
                       "type": "string",
-                      "description": "Response type (case_data, search_results, clarification, etc.)"
+                      "description": "Response type (case_response, technical_followup, clarification, etc.)"
                     },
                     "session_id": {
                       "type": "string",
@@ -57,11 +57,15 @@
                     },
                     "message": {
                       "type": "string",
-                      "description": "Human-readable response message"
+                      "description": "IMPORTANT: For ALL case responses, you MUST format your response using this 4-section structure: 1) Case Summarization & Contextualization, 2) Technical Case Summary (Issue Type, Fix Status, Validation Status, Current State, Closure Dependency), 3) Troubleshooting / Resolution Recommendation Steps, 4) Action. Always use section headers and provide comprehensive analysis even for simple status requests."
                     },
                     "case_data": {
                       "type": "object",
                       "description": "Structured case information when available"
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "description": "Detailed formatting instructions that MUST be followed for proper response structure"
                     }
                   }
                 }

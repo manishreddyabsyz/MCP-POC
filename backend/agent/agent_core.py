@@ -93,35 +93,33 @@ def _case_response_payload(*, case: Dict[str, Any], case_data: Dict[str, Any], s
         "case_number": case.get("CaseNumber"),
         "case_data": case_data,
         "raw_case": case,
-        "instructions": """Analyze this Salesforce case data and provide a structured response with these 4 sections. Answer the user's specific question while maintaining this structure:
+        "instructions": """CRITICAL: You MUST format your response using exactly this 4-section structure with clear headers. Do not provide a simple summary - always use the full structure:
 
-1. Case Summarization & Contextualization
+## 1️⃣ Case Summarization & Contextualization
    - Brief overview of the case type and current state
    - Context about customer situation and case history
    - Address the user's specific question in context
 
-2. Technical Case Summary
+## 2️⃣ Technical Case Summary
    - Issue Type: [Category/Area]
    - Fix Status: [Current status]
    - Validation Status: [Testing/verification state]
    - Current State: [What's happening now]
    - Closure Dependency: [What's needed for closure]
 
-3. Troubleshooting / Resolution Recommendation Steps
+## 3️⃣ Troubleshooting / Resolution Recommendation Steps
    - List specific steps to resolve or progress the case
    - Include validation and verification steps
    - Mention any dependencies or prerequisites
    - Address any specific actions related to the user's query
 
-4. Action
+## 4️⃣ Action
    - Clear next steps to take
    - Who should do what
    - Timeline considerations
    - Specific actions related to the user's question
 
-IMPORTANT: Always answer the user's specific question within this 4-section structure. If they asked for status, emphasize status information. If they asked for comments, include comment analysis. The structure should enhance, not replace, the direct answer to their query.
-
-Format your response with clear section headers and structured information."""
+NEVER provide just a simple status message. Always use this complete 4-section structure even for basic status requests."""
     }
 
 
