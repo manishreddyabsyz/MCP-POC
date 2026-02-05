@@ -299,6 +299,7 @@ def _load_case_by_subject(subject: str):
         from salesforce import case_queries  # lazy import
         print(subject, "subject")
         records = case_queries.get_case_by_subject(subject)
+        print(records,"records")
         return records or [], "salesforce", None
     except Exception as e:
         return [], "salesforce_error", f"{type(e).__name__}: {e}"
@@ -519,6 +520,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         return payload
 
     if wants_in_progress and ("case" in q_lower or "cases" in q_lower):
+        print("in progress")
         try:
             from salesforce import case_queries  # lazy import
 
