@@ -272,25 +272,81 @@ def _search_cases(search_text: str) -> List[Dict[str, Any]]:
         return []
 
 def _extract_compliance_number(q: str) -> Optional[str]:
+    """Extract compliance number from various patterns"""
     import re
-    match = re.search(r'\bcompliance[\s:-]*([A-Za-z0-9-]+)', q, re.I)
-    return match.group(1) if match else None
+    # Look for patterns like "compliance 123", "compliance: ABC-123", "compliance number XYZ"
+    patterns = [
+        r'\bcompliance[\s:-]*(?:number[\s:-]*)?([A-Za-z0-9-_]+)',
+        r'\bcomp[\s:-]*(?:num[\s:-]*)?([A-Za-z0-9-_]+)',
+        r'\b([A-Za-z]{2,4}-\d{3,6})\b',  # Pattern like ABC-1234
+        r'\b(C\d{4,8})\b',  # Pattern like C12345
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, q, re.I)
+        if match:
+            return match.group(1)
+    return None
 
 def _load_case_by_compliance(compliance_no):
 
     try:
         from salesforce import case_queries  # lazy import
-
+        print(compliance_no, "compliance_no")
         records = case_queries.get_case_by_compliance(compliance_no)
         return records or [], "salesforce", None
     except Exception as e:
         return [], "salesforce_error", f"{type(e).__name__}: {e}"
     
 def _extract_subject(q: str) -> Optional[str]:
+    """Extract subject keywords from various patterns"""
     import re
-    match = re.search(r'(subject|about|regarding)\s+(.+)', q, re.I)
-    print(match, "matches")
-    return match.group(2).strip() if match else None
+    
+    print(f"🔍 Subject extraction debug for: '{q}'")
+    
+    # Look for explicit subject patterns first
+    patterns = [
+        r'(?:subject|about|regarding|topic)[\s:-]+(.+?)(?:\s+case|\s+issue|$)',
+        r'(?:find|search|show).*?(?:subject|about|regarding)[\s:-]+(.+?)(?:\s+case|\s+issue|$)',
+        r'(?:case|cases).*?(?:subject|about|regarding)[\s:-]+(.+?)(?:\s+case|\s+issue|$)',
+    ]
+    
+    for i, pattern in enumerate(patterns):
+        match = re.search(pattern, q, re.I)
+        if match:
+            subject = match.group(1).strip()
+            print(f"   Pattern {i+1} matched: '{subject}'")
+            # Clean up common words that might be captured
+            cleaned = re.sub(r'\b(?:case|cases|issue|issues|problem|problems)\b', '', subject, flags=re.I).strip()
+            if len(cleaned) > 2:  # Only return if meaningful content
+                print(f"   Final extracted subject: '{cleaned}'")
+                return cleaned
+    
+    # If no explicit pattern, look for quoted strings
+    quoted_match = re.search(r'["\']([^"\']{3,})["\']', q)
+    if quoted_match:
+        result = quoted_match.group(1)
+        print(f"   Quoted string found: '{result}'")
+        return result
+    
+    # For queries that look like direct subject searches (no explicit keywords)
+    # Check if the query contains technical terms that suggest it's a subject
+    technical_keywords = ['error', 'failed', 'issue', 'problem', 'bug', 'timeout', 'connection', 
+                         'not working', 'unable', 'cannot', 'can\'t', 'jira', 'database', 
+                         'api', 'login', 'authentication', 'permission', 'access']
+    
+    if any(keyword in q.lower() for keyword in technical_keywords):
+        # Remove common query prefixes but keep the core content
+        cleaned = re.sub(r'^\b(?:show|find|search|get|display)\s+(?:cases?\s+)?(?:with\s+|for\s+|about\s+)?', '', q, flags=re.I)
+        cleaned = re.sub(r'\s+(?:case|cases|issue|issues)$', '', cleaned, flags=re.I)
+        cleaned = cleaned.strip()
+        
+        if len(cleaned) > 3:
+            print(f"   Technical keyword match, extracted: '{cleaned}'")
+            return cleaned
+    
+    print(f"   No subject extracted from: '{q}'")
+    return None
 
 def _load_case_by_subject(subject: str):
 
@@ -309,7 +365,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
     state = memory.get(session_id)
     q = (user_query or "").strip()
     q_lower = q.lower()
-
+    print(q_lower, "q_lower in the handle")
     wants_status = "status" in q_lower and ("case" in q_lower or _extract_primary_token(q) is not None)
     wants_in_progress = ("in progress" in q_lower) or ("in-progress" in q_lower) or ("working" in q_lower)
 
@@ -351,6 +407,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
 
     primary_token = _extract_primary_token(q)
     compliance_no = _extract_compliance_number(q)
+    print(compliance_no, "compliance_no after extraction")
     subject = _extract_subject(q)
     print(f"🔍 Case detection debug:")
     print(f"   Input query: '{q}'")
@@ -390,21 +447,66 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
     case: Dict[str, Any] | None
     source: str
     detail: Optional[str]
+    search_results: List[Dict[str, Any]] = []
+    
     print(case_number, subject,"case number")
     print(case_id,case_number,compliance_no,subject)
+    
     if case_id:
         case, source, detail = _load_case_by_id(case_id)
     elif case_number:
         case, source, detail = _load_case_by_number(case_number)
     elif compliance_no:
-        case, source, detail = _load_case_by_compliance(compliance_no)
+        print(compliance_no, "compliance_no inside condition block")
+        search_results, source, detail = _load_case_by_compliance(compliance_no)
+        case = search_results[0] if search_results else None
     elif subject:
         print("subject in",subject)
-        case, source, detail = _load_case_by_subject(subject)
+        search_results, source, detail = _load_case_by_subject(subject)
+        
+        # If subject search fails, try the enhanced keyword search as fallback
+        if not search_results and source != "salesforce_error":
+            print(f"Subject search failed, trying keyword search for: '{subject}'")
+            try:
+                from salesforce import case_queries
+                keyword_results = case_queries.search_cases_by_keywords(subject)
+                if keyword_results:
+                    search_results = keyword_results
+                    print(f"Keyword search found {len(keyword_results)} results")
+            except Exception as e:
+                print(f"Keyword search also failed: {e}")
+        
+        case = search_results[0] if search_results else None
     else:
         case, source, detail = None, "", None
+    
     print(case_id,"caseid")
-    if case_id or case_number:
+    
+    # Handle search results with multiple matches
+    if search_results and len(search_results) > 1:
+        candidates = [
+            {
+                "Id": r.get("Id"),
+                "CaseNumber": r.get("CaseNumber"),
+                "Subject": r.get("Subject"),
+                "Status": r.get("Status"),
+                "Description": r.get("Description"),
+                "Priority": r.get("Priority"),
+            }
+            for r in search_results[:10]
+        ]
+        search_type = "compliance number" if compliance_no else "subject"
+        return {
+            "type": "case_search_results",
+            "session_id": session_id,
+            "message": f"I found {len(search_results)} cases matching the {search_type} '{compliance_no or subject}'. Reply with the CaseNumber you want me to summarize.",
+            "candidates": candidates,
+            "search_term": compliance_no or subject,
+            "search_type": search_type,
+        }
+    
+    # Handle single case or first result from search
+    if case_id or case_number or (case and (compliance_no or subject)):
         # Explicit "comments" request - use 4-section structure with comments focus
         if "comment" in q_lower:
             comments, source, detail = _load_case_comments(case_id or (case or {}).get("Id")) if (case_id or case) else ([], "", None)
@@ -480,6 +582,12 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
 
         if not case:
             if source == "salesforce_error":
+                search_info = {}
+                if compliance_no:
+                    search_info["compliance_number"] = compliance_no
+                if subject:
+                    search_info["subject"] = subject
+                    
                 return {
                     "type": "error",
                     "session_id": session_id,
@@ -487,14 +595,42 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
                     "case_id": case_id,
                     "case_number": case_number,
                     "detail": detail,
+                    **search_info,
                 }
-            return {
-                "type": "error",
-                "session_id": session_id,
-                "error": "Case not found in Salesforce",
-                "case_id": case_id,
-                "case_number": case_number,
-            }
+            
+            # Handle case not found for different search types
+            if compliance_no:
+                return {
+                    "type": "error",
+                    "session_id": session_id,
+                    "error": f"No cases found with compliance number '{compliance_no}'",
+                    "compliance_number": compliance_no,
+                    "suggestions": [
+                        "Check if the compliance number is correct",
+                        "Try searching by case number or subject instead",
+                        "The compliance number might be in a different field"
+                    ]
+                }
+            elif subject:
+                return {
+                    "type": "error",
+                    "session_id": session_id,
+                    "error": f"No cases found with subject containing '{subject}'",
+                    "subject": subject,
+                    "suggestions": [
+                        "Try different keywords from the case subject",
+                        "Search by case number if you know it",
+                        "Use broader search terms"
+                    ]
+                }
+            else:
+                return {
+                    "type": "error",
+                    "session_id": session_id,
+                    "error": "Case not found in Salesforce",
+                    "case_id": case_id,
+                    "case_number": case_number,
+                }
 
         # Always use 4-section structure for case queries, but customize the focus based on the question
         case_data = prepare_case_data(case)
