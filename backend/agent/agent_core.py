@@ -271,6 +271,38 @@ def _search_cases(search_text: str) -> List[Dict[str, Any]]:
     except Exception:
         return []
 
+def _extract_compliance_number(q: str) -> Optional[str]:
+    import re
+    match = re.search(r'\bcompliance[\s:-]*([A-Za-z0-9-]+)', q, re.I)
+    return match.group(1) if match else None
+
+def _load_case_by_compliance(compliance_no):
+
+    try:
+        from salesforce import case_queries  # lazy import
+
+        records = case_queries.get_case_by_compliance(compliance_no)
+        return records or [], "salesforce", None
+    except Exception as e:
+        return [], "salesforce_error", f"{type(e).__name__}: {e}"
+    
+def _extract_subject(q: str) -> Optional[str]:
+    import re
+    match = re.search(r'(subject|about|regarding)\s+(.+)', q, re.I)
+    print(match, "matches")
+    return match.group(2).strip() if match else None
+
+def _load_case_by_subject(subject: str):
+
+    try: 
+
+        from salesforce import case_queries  # lazy import
+        print(subject, "subject")
+        records = case_queries.get_case_by_subject(subject)
+        return records or [], "salesforce", None
+    except Exception as e:
+        return [], "salesforce_error", f"{type(e).__name__}: {e}"
+    
 
 def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) -> Dict[str, Any]:
     state = memory.get(session_id)
@@ -317,6 +349,8 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         )
 
     primary_token = _extract_primary_token(q)
+    compliance_no = _extract_compliance_number(q)
+    subject = _extract_subject(q)
     print(f"🔍 Case detection debug:")
     print(f"   Input query: '{q}'")
     print(f"   Primary token: '{primary_token}'")
@@ -360,6 +394,10 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
         case, source, detail = _load_case_by_id(case_id)
     elif case_number:
         case, source, detail = _load_case_by_number(case_number)
+    elif compliance_no:
+        case, source, detail = _load_case_by_compliance(compliance_no)
+    elif subject:
+        case, source, detail = _load_case_by_subject(subject)
     else:
         case, source, detail = None, "", None
     print(case_id,"caseid")

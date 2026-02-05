@@ -83,3 +83,23 @@ def get_case_feed(case_id: str):
     """
     return sf.query(query)["records"]
 
+def get_case_by_compliance(compliance_no: str):
+    query = f"""
+        SELECT Id, CaseNumber, Subject, Status
+        FROM Case
+        WHERE Compliance_Number__c = '{compliance_no}'
+        ORDER BY CreatedDate DESC
+        LIMIT 1
+    """
+
+    return sf.query(query)["records"]
+
+def get_case_by_subject(subject: str):
+    query = f"""
+        SELECT Id, CaseNumber, Subject, Status
+        FROM Case
+        WHERE Subject LIKE '%{subject}%'
+        ORDER BY CreatedDate DESC
+        LIMIT 5
+    """
+    return sf.query(query)["records"]
