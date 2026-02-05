@@ -389,7 +389,8 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
     case: Dict[str, Any] | None
     source: str
     detail: Optional[str]
-    print(case_number,"case number")
+    print(case_number, subject,"case number")
+    print(case_id,case_number,compliance_no,subject)
     if case_id:
         case, source, detail = _load_case_by_id(case_id)
     elif case_number:
@@ -397,6 +398,7 @@ def handle_user_query(*, user_query: str, session_id: str, memory: MemoryStore) 
     elif compliance_no:
         case, source, detail = _load_case_by_compliance(compliance_no)
     elif subject:
+        print("subject in",subject)
         case, source, detail = _load_case_by_subject(subject)
     else:
         case, source, detail = None, "", None

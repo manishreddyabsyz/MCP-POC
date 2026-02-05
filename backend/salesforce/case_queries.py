@@ -95,6 +95,7 @@ def get_case_by_compliance(compliance_no: str):
     return sf.query(query)["records"]
 
 def get_case_by_subject(subject: str):
+    print(subject,"in query")
     query = f"""
         SELECT Id, CaseNumber, Subject, Status
         FROM Case
