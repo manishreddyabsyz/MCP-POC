@@ -110,7 +110,6 @@ def get_case_by_subject(subject: str):
         WHERE Subject LIKE '%{safe_subject}%'
            OR Description LIKE '%{safe_subject}%'
         ORDER BY CreatedDate DESC
-        LIMIT 10
     """
     
     print(f"Query 1 (exact phrase): {query1}")
@@ -136,7 +135,6 @@ def get_case_by_subject(subject: str):
             FROM Case
             WHERE {' OR '.join(word_conditions)}
             ORDER BY CreatedDate DESC
-            LIMIT 10
         """
         
         print(f"Query 2 (individual words): {query2}")
@@ -154,7 +152,6 @@ def get_case_by_subject(subject: str):
             FIND {{{escaped_subject}}}
             IN ALL FIELDS
             RETURNING Case(Id, CaseNumber, Subject, Description, Status, Priority, Contact.Name)
-            LIMIT 10
         """
         
         print(f"SOSL Query: {sosl_query}")
@@ -181,7 +178,6 @@ def search_cases_by_keywords(keywords: str):
            OR Description LIKE '%{safe_keywords}%'
            OR CaseNumber LIKE '%{safe_keywords}%'
         ORDER BY LastModifiedDate DESC
-        LIMIT 10
     """
     return sf.query(query)["records"]
            
