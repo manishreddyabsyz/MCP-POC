@@ -63,12 +63,12 @@ def _extract_primary_token(text: str) -> Optional[str]:
             return token
     
     # Finally, look for 9-14 character tokens that look like IDs
-    medium_token_matches = re.findall(r"\b[A-Za-z0-9]{9,14}\b", text)
-    for token in medium_token_matches:
-        # Skip common words and pure alphabetic tokens
-        if (not token.isalpha() and 
-            token.lower() not in ['salesforce', 'casenumber', 'case', 'troubleshooting']):
-            return token
+    # medium_token_matches = re.findall(r"\b[A-Za-z0-9]{9,14}\b", text)
+    # for token in medium_token_matches:
+    #     # Skip common words and pure alphabetic tokens
+    #     if (not token.isalpha() and 
+    #         token.lower() not in ['salesforce', 'casenumber', 'case', 'troubleshooting']):
+    #         return token
     
     return None
 
@@ -298,54 +298,67 @@ def _load_case_by_compliance(compliance_no):
     except Exception as e:
         return [], "salesforce_error", f"{type(e).__name__}: {e}"
     
+from typing import Optional
+import re
+
 def _extract_subject(q: str) -> Optional[str]:
-    """Extract subject keywords from various patterns"""
-    import re
-    
-    print(f"🔍 Subject extraction debug for: '{q}'")
-    
-    # Look for explicit subject patterns first
-    patterns = [
-        r'(?:subject|about|regarding|topic)[\s:-]+(.+?)(?:\s+case|\s+issue|$)',
-        r'(?:find|search|show).*?(?:subject|about|regarding)[\s:-]+(.+?)(?:\s+case|\s+issue|$)',
-        r'(?:case|cases).*?(?:subject|about|regarding)[\s:-]+(.+?)(?:\s+case|\s+issue|$)',
+    print(f"🔍 Extracting subject from: '{q}'")
+
+    q = q.strip().lower()
+
+    # Expanded list of command/filler phrases
+    command_phrases = [
+        "get me the details for",
+        "get me case details for",
+        "need details for",
+        "need case details for",
+        "show me details for",
+        "show case details for",
+        "fetch details for",
+        "find details for",
+        "case details for",
+        "details for",
+        "information about",
+        "information regarding",
+        "please show",
+        "please get",
+        "please fetch",
     ]
-    
-    for i, pattern in enumerate(patterns):
-        match = re.search(pattern, q, re.I)
-        if match:
-            subject = match.group(1).strip()
-            print(f"   Pattern {i+1} matched: '{subject}'")
-            # Clean up common words that might be captured
-            cleaned = re.sub(r'\b(?:case|cases|issue|issues|problem|problems)\b', '', subject, flags=re.I).strip()
-            if len(cleaned) > 2:  # Only return if meaningful content
-                print(f"   Final extracted subject: '{cleaned}'")
-                return cleaned
-    
-    # If no explicit pattern, look for quoted strings
-    quoted_match = re.search(r'["\']([^"\']{3,})["\']', q)
-    if quoted_match:
-        result = quoted_match.group(1)
-        print(f"   Quoted string found: '{result}'")
-        return result
-    
-    # For queries that look like direct subject searches (no explicit keywords)
-    # Check if the query contains technical terms that suggest it's a subject
-    technical_keywords = ['error', 'failed', 'issue', 'problem', 'bug', 'timeout', 'connection', 
-                         'not working', 'unable', 'cannot', 'can\'t', 'jira', 'database', 
-                         'api', 'login', 'authentication', 'permission', 'access']
-    
-    if any(keyword in q.lower() for keyword in technical_keywords):
-        # Remove common query prefixes but keep the core content
-        cleaned = re.sub(r'^\b(?:show|find|search|get|display)\s+(?:cases?\s+)?(?:with\s+|for\s+|about\s+)?', '', q, flags=re.I)
-        cleaned = re.sub(r'\s+(?:case|cases|issue|issues)$', '', cleaned, flags=re.I)
-        cleaned = cleaned.strip()
-        
-        if len(cleaned) > 3:
-            print(f"   Technical keyword match, extracted: '{cleaned}'")
-            return cleaned
-    
-    print(f"   No subject extracted from: '{q}'")
+
+    # Remove any matching command phrase at the start
+    for phrase in command_phrases:
+        if q.startswith(phrase):
+            q = q[len(phrase):].strip()
+            break
+
+    # Remove single command words
+    command_words = {
+        "get", "show", "find", "search", "fetch", "display",
+        "case", "cases", "details", "information",
+        "about", "regarding", "subject",
+        "status", "please", "me", "for"
+    }
+
+    words = q.split()
+    cleaned_words = [w for w in words if w not in command_words]
+
+    # Remove case numbers or IDs
+    cleaned_words = [
+        w for w in cleaned_words
+        if not re.fullmatch(r"[A-Za-z0-9]{9,18}", w)
+    ]
+
+    # Strip leading stopwords like "the", "a", "an"
+    while cleaned_words and cleaned_words[0] in {"the", "a", "an"}:
+        cleaned_words.pop(0)
+
+    subject = " ".join(cleaned_words).strip()
+
+    if subject and len(subject) >= 2:
+        print(f"✅ Extracted subject: '{subject}'")
+        return subject
+
+    print("❌ No subject extracted")
     return None
 
 def _load_case_by_subject(subject: str):
