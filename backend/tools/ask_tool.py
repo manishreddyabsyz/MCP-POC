@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from agent.agent_core import handle_user_query
 from agent.memory import MemoryStore
 
-mcp = FastMCP(streamable_http_path="/")
+mcp = FastMCP(
+    streamable_http_path="/",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 _memory = MemoryStore()
 
 
