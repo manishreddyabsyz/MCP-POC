@@ -23,7 +23,7 @@ if backend_path not in sys.path:
 from tools.ask_tool import mcp, ask, salesforce_health
 
 # Create FastAPI app for health checks and HTTP endpoints
-app = FastAPI(title="Salesforce MCP Server")
+app = FastAPI(title="Salesforce MCP Server", redirect_slashes=False)
 
 @app.get("/")
 async def root():
@@ -68,6 +68,7 @@ async def debug_env():
         )
 
 @app.post("/ask")
+@app.post("/ask/")
 async def ask_endpoint(request: dict):
     """HTTP endpoint for MCP ask tool"""
     print(f"🔍 Ask endpoint called")
