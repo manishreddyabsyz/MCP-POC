@@ -20,7 +20,7 @@ backend_path = os.path.join(project_root, 'backend')
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
-from tools.ask_tool import mcp, ask, salesforce_health
+from tools.ask_tool import mcp, salesforce_health
 
 # Create FastAPI app for health checks and HTTP endpoints
 app = FastAPI(title="Salesforce MCP Server", redirect_slashes=False)
@@ -67,45 +67,9 @@ async def debug_env():
             content={"error": str(e)}
         )
 
-@app.post("/ask")
-@app.post("/ask/")
-async def ask_endpoint(request: dict):
-    """HTTP endpoint for MCP ask tool"""
-    print(f"🔍 Ask endpoint called")
-    print(f"   Raw request: {request}")
-    print(f"   Request type: {type(request)}")
-    
-    try:
-        # Handle both Custom GPT format (nested under 'params') and direct format
-        if "params" in request:
-            # Custom GPT format
-            params = request["params"]
-            user_query = params.get("user_query", "")
-            session_id = params.get("session_id", "default")
-            print(f"   Using Custom GPT format (params)")
-        else:
-            # Direct format (Postman, etc.)
-            user_query = request.get("user_query", "")
-            session_id = request.get("session_id", "default")
-            print(f"   Using direct format")
-        
-        print(f"   Extracted query: '{user_query}'")
-        print(f"   Extracted session: '{session_id}'")
-        print(f"   Query type: {type(user_query)}")
-        
-        result = ask(user_query, session_id)
-        print(f"✅ Ask result type: {result.get('type', 'unknown')}")
-        print(f"   Result keys: {list(result.keys())}")
-        
-        return result
-    except Exception as e:
-        print(f"❌ Ask endpoint failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+# Mount the MCP server's streamable HTTP app at /ask so Copilot Studio's
+# JSON-RPC protocol (initialize → tools/list → tools/call) is handled natively.
+app.mount("/ask", mcp.streamable_http_app())
 
 if __name__ == "__main__":
     print("🚀 Salesforce MCP POC running...")
