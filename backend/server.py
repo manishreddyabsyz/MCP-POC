@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import sys
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -22,8 +23,17 @@ if backend_path not in sys.path:
 
 from tools.ask_tool import mcp, salesforce_health
 
+# Build the MCP ASGI app first so _session_manager is initialized
+_mcp_app = mcp.streamable_http_app()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Run the MCP session manager's task group for the lifetime of the server
+    async with mcp.session_manager.run():
+        yield
+
 # Create FastAPI app for health checks and HTTP endpoints
-app = FastAPI(title="Salesforce MCP Server", redirect_slashes=False)
+app = FastAPI(title="Salesforce MCP Server", redirect_slashes=False, lifespan=lifespan)
 
 @app.get("/")
 async def root():
@@ -67,9 +77,7 @@ async def debug_env():
             content={"error": str(e)}
         )
 
-# Mount the MCP server's streamable HTTP app at /ask so Copilot Studio's
-# JSON-RPC protocol (initialize → tools/list → tools/call) is handled natively.
-app.mount("/ask", mcp.streamable_http_app())
+app.mount("/ask", _mcp_app)
 
 if __name__ == "__main__":
     print("🚀 Salesforce MCP POC running...")
