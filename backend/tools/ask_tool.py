@@ -5,7 +5,7 @@ from mcp.server.fastmcp import FastMCP
 from agent.agent_core import handle_user_query
 from agent.memory import MemoryStore
 
-mcp = FastMCP()
+mcp = FastMCP(streamable_http_path="/")
 _memory = MemoryStore()
 
 
